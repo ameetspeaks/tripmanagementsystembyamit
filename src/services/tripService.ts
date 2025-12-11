@@ -196,3 +196,22 @@ export async function createTripAlert(tripId: string, alert: { type: 'RouteDevia
   const { error } = await supabase.from('trip_alerts').insert({ trip_id: trip.id, alert_type: alert.type, severity: alert.severity ?? 'Medium', message: alert.message ?? null });
   if (error) throw error;
 }
+
+export async function listTrips() {
+  const { data, error } = await supabase
+    .from('trips')
+    .select('trip_id, origin_name, destination_name, vehicle_number, driver_name, start_time, end_time, status')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map((t: any) => ({
+    id: t.trip_id,
+    tripId: t.trip_id,
+    origin: t.origin_name ?? '',
+    destination: t.destination_name ?? '',
+    vehicle: t.vehicle_number ?? '',
+    driver: t.driver_name ?? '',
+    startDate: t.start_time ? String(t.start_time).slice(0, 10) : '',
+    eta: t.end_time ? String(t.end_time).slice(0, 10) : '',
+    status: t.status ?? '',
+  }));
+}

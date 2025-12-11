@@ -27,7 +27,7 @@ import { listShipments } from "@/services/shipmentService";
 import { createTrip, mapShipmentsToTrip } from "@/services/tripService";
 import { Checkbox } from "@/components/ui/checkbox";
 import { getToken, isExpired } from "@/services/tokenService";
-import { upsertConsentForDriver } from "@/services/consentService";
+import { upsertConsentForDriver, checkConsentForDriver } from "@/services/consentService";
 import { RefreshCcw } from "lucide-react";
 
 interface TripFormPageProps {
@@ -38,8 +38,8 @@ const transporters = ["Global Logistics Inc.", "Express Transport Co.", "Swift C
 
 // Mock existing data for edit/view
 const mockTrips: Record<string, TripFormData & { shipmentIds?: string[] }> = {
-  "1": { tripId: "TRP001", laneId: "LN001", vehicle: "MH12AB1234", driver: "Ramesh Kumar", transporter: "Global Logistics Inc.", startDate: "2024-01-15", startTime: "09:00", estimatedArrival: "2024-01-17", status: "In Transit", shipmentIds: ["SHP001", "SHP003"] },
-  "2": { tripId: "TRP002", laneId: "LN002", vehicle: "TN07EF9012", driver: "Suresh Yadav", transporter: "Express Transport Co.", startDate: "2024-01-14", startTime: "08:00", estimatedArrival: "2024-01-15", status: "Completed", shipmentIds: ["SHP002"] },
+  "1": { tripId: "TRP001", laneId: "LN001", vehicle: "MH12AB1234", driver: "Ramesh Kumar", transporter: "Global Logistics Inc.", startDate: "2024-01-15", startTime: "09:00", estimatedArrival: "2024-01-17", trackingType: "SIM", shipmentIds: ["SHP001", "SHP003"] },
+  "2": { tripId: "TRP002", laneId: "LN002", vehicle: "TN07EF9012", driver: "Suresh Yadav", transporter: "Express Transport Co.", startDate: "2024-01-14", startTime: "08:00", estimatedArrival: "2024-01-15", trackingType: "SIM", shipmentIds: ["SHP002"] },
 };
 
 const TripFormPage = ({ mode }: TripFormPageProps) => {
@@ -79,10 +79,28 @@ const TripFormPage = ({ mode }: TripFormPageProps) => {
   const [refreshingConsent, setRefreshingConsent] = useState(false);
 
   useEffect(() => {
-    setConsentStatus("");
-    if (!selectedDriverMobile || selectedDriverMobile.length !== 10) return;
-    const drv = (driversData || []).find(d => d.mobileNumber === selectedDriverMobile);
-    if (drv) setConsentStatus(drv.consentStatus || "");
+    const checkConsent = async () => {
+      setConsentStatus("");
+      if (!selectedDriverMobile || selectedDriverMobile.length !== 10) return;
+      const drv = (driversData || []).find(d => d.mobileNumber === selectedDriverMobile);
+      if (!drv) return;
+
+      // First show the stored status
+      setConsentStatus(drv.consentStatus || "");
+
+      // Then check fresh status from API if we have a stored status
+      if (drv.consentStatus) {
+        try {
+          const freshStatus = await checkConsentForDriver(drv.id, `91${selectedDriverMobile}`);
+          setConsentStatus(freshStatus);
+        } catch (e) {
+          // Keep the stored status if API fails
+          console.warn('Could not refresh consent status:', e);
+        }
+      }
+    };
+
+    checkConsent();
   }, [selectedDriverMobile, driversData]);
 
   useEffect(() => {
@@ -270,23 +288,17 @@ const TripFormPage = ({ mode }: TripFormPageProps) => {
                     Consent: {consentChecking ? 'Checking…' : consentStatus === 'ALLOWED' ? 'ALLOWED' : consentStatus === 'TOKEN_EXPIRED' ? 'Token expired, refresh required' : consentStatus || 'UNKNOWN'}
                   </p>
                 )}
-                {!isReadOnly && consentStatus === 'Pending' && (
+                {!isReadOnly && selectedDriverMobile && (
                   <Button type="button" variant="ghost" size="sm" className="mt-1" disabled={refreshingConsent} onClick={async () => {
                     setRefreshingConsent(true);
                     try {
                       const drv = (driversData || []).find(d => d.mobileNumber === selectedDriverMobile);
                       if (!drv) return;
-                      const { data } = await (await import('@/lib/supabaseClient')).supabase
-                        .from('consents')
-                        .select('status')
-                        .eq('driver_id', drv.id)
-                        .limit(1);
-                      if (data && data.length) {
-                        const s = data[0].status as string;
-                        setConsentStatus(s);
-                      }
+                      const status = await checkConsentForDriver(drv.id, `91${selectedDriverMobile}`);
+                      setConsentStatus(status);
+                      toast.success('Consent status updated');
                     } catch (e: any) {
-                      toast.error(e.message || 'Consent refresh failed');
+                      toast.error(e.message || 'Consent check failed');
                     } finally {
                       setRefreshingConsent(false);
                     }

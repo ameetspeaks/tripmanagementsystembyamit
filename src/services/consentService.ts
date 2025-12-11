@@ -23,3 +23,55 @@ export async function upsertConsentForDriver(driverId: string, msisdn: string, s
     return inserted.id as string;
   }
 }
+
+export async function checkConsentForDriver(driverId: string, msisdn: string) {
+  try {
+    // Get the consent token from database
+    const { data: tokenData, error: tokenError } = await supabase
+      .from('integration_tokens')
+      .select('token_value')
+      .eq('provider', 'telenity')
+      .eq('token_type', 'consent')
+      .eq('active', true)
+      .limit(1);
+
+    if (tokenError || !tokenData || !tokenData.length) {
+      throw new Error('No consent token available');
+    }
+
+    const token = tokenData[0].token_value;
+
+    // Call the Telenity consent API directly
+    const res = await fetch(`https://india-agw.telenity.com/apigw/NOFBconsent/v1/NOFBconsent?address=tel:+${msisdn}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': '*/*',
+        'Authorization': `bearer ${token}`
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error(`Consent check failed: ${res.status}`);
+    }
+
+    const data = await res.json();
+
+    // Extract the consent status from the response
+    const status = data?.Consent?.status || 'UNKNOWN';
+
+    // Update the database with the fresh status
+    await upsertConsentForDriver(driverId, msisdn, status);
+
+    return status;
+  } catch (error) {
+    console.error('Consent check error:', error);
+    // Don't update the database on error, just return the current status
+    const { data } = await supabase
+      .from('consents')
+      .select('status')
+      .eq('driver_id', driverId)
+      .limit(1);
+    return data?.[0]?.status || 'UNKNOWN';
+  }
+}

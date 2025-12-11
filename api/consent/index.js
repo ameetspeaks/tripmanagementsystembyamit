@@ -7,6 +7,91 @@ if (!url || !key) {
 }
 const supabase = createClient(url, key);
 
+// Token refresh functions (copied from refreshTokens.js)
+async function getAuthToken(authorizationToken) {
+  const res = await fetch('https://smarttrail.telenity.com/trail-rest/login', {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json', Authorization: `Basic ${authorizationToken}` },
+  });
+  if (!res.ok) throw new Error('Telenity auth failed');
+  const json = await res.json();
+  return { token: json.token, expiresAt: toISTISO(Date.now() + 6 * 60 * 60 * 1000) };
+}
+
+async function getConsentAccessToken(consentAuthToken) {
+  const res = await fetch('https://india-agw.telenity.com/oauth/token?grant_type=client_credentials', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: `Basic ${consentAuthToken}` },
+    body: 'grant_type=client_credentials',
+  });
+  if (!res.ok) throw new Error('Consent auth failed');
+  const json = await res.json();
+  const expiresIn = json.expires_in ?? 3600;
+  return { accessToken: json.access_token, expiresAt: toISTISO(Date.now() + expiresIn * 1000) };
+}
+
+async function setToken(provider, tokenType, token, expiresAt) {
+  await supabase.from('integration_tokens').update({ active: false }).eq('provider', provider).eq('token_type', tokenType);
+  const { error } = await supabase.from('integration_tokens').insert({ provider, token_type: tokenType, token_value: token, expires_at: expiresAt, active: true });
+  if (error) throw error;
+}
+
+async function refreshTokensIfNeeded() {
+  try {
+    // Get settings
+    const { data: settings } = await supabase
+      .from('sim_tracking_settings')
+      .select('authorization_token, consent_auth_token')
+      .eq('is_active', true)
+      .limit(1);
+
+    if (!settings || !settings.length) {
+      console.error('No SIM tracking settings found');
+      return false;
+    }
+
+    const authCred = settings[0].authorization_token;
+    const consentCred = settings[0].consent_auth_token;
+
+    if (!authCred || !consentCred) {
+      console.error('Missing auth credentials in settings');
+      return false;
+    }
+
+    // Refresh tokens
+    console.log('Refreshing tokens...');
+    const auth = await getAuthToken(authCred);
+    await setToken('telenity', 'auth', auth.token, auth.expiresAt);
+
+    const consent = await getConsentAccessToken(consentCred);
+    await setToken('telenity', 'consent', consent.accessToken, consent.expiresAt);
+
+    console.log('Tokens refreshed successfully');
+    return true;
+  } catch (error) {
+    console.error('Failed to refresh tokens:', error);
+    return false;
+  }
+}
+
+function toISTISO(ms) {
+  const d = new Date(ms);
+  const fmt = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  }).formatToParts(d);
+  const get = (t) => fmt.find(p => p.type === t).value;
+  const yyyy = get('year');
+  const mm = get('month');
+  const dd = get('day');
+  const hh = get('hour');
+  const mi = get('minute');
+  const ss = get('second');
+  return `${yyyy}-${mm}-${dd}T${hh}:${mi}:${ss}+05:30`;
+}
+
 async function getToken(provider, tokenType) {
   const { data } = await supabase
     .from('integration_tokens')
@@ -16,16 +101,26 @@ async function getToken(provider, tokenType) {
     .eq('active', true)
     .order('expires_at', { ascending: false })
     .limit(1);
-  if (!data || !data.length) return null;
+  if (!data || !data.length) {
+    console.error(`No ${tokenType} token found in database`);
+    return null;
+  }
 
-  // Check if token is expired
+  // Check if token is expired or will expire in next 5 minutes
   const expiresAt = new Date(data[0].expires_at);
   const now = new Date();
+  const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000);
+
   if (expiresAt <= now) {
     console.error(`Token expired: ${expiresAt} <= ${now}`);
     return null;
   }
 
+  if (expiresAt <= fiveMinutesFromNow) {
+    console.warn(`Token expires soon: ${expiresAt} <= ${fiveMinutesFromNow}`);
+  }
+
+  console.log(`Using ${tokenType} token, expires: ${expiresAt}`);
   return { token: data[0].token_value, expiresAt: data[0].expires_at };
 }
 
@@ -53,11 +148,18 @@ export default async function handler(req, res) {
       return;
     }
 
-    const tok = await getToken('telenity', 'consent');
+    let tok = await getToken('telenity', 'consent');
     if (!tok) {
-      console.error('No valid consent token found');
-      res.status(500).json({ error: 'No consent token available or token expired' });
-      return;
+      console.log('No valid consent token found, attempting to refresh tokens...');
+      const refreshed = await refreshTokensIfNeeded();
+      if (refreshed) {
+        tok = await getToken('telenity', 'consent');
+      }
+      if (!tok) {
+        console.error('Still no valid consent token after refresh attempt');
+        res.status(500).json({ error: 'No consent token available or token expired' });
+        return;
+      }
     }
 
     console.log(`Making consent check request for msisdn: ${msisdn}`);

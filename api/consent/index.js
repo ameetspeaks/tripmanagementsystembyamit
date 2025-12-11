@@ -144,25 +144,33 @@ async function getToken(provider, tokenType) {
 }
 
 export default async function handler(req, res) {
+  console.log('Consent API called with method:', req.method);
+  console.log('Query params:', req.query);
+
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
 
   if (req.method === 'OPTIONS') {
+    console.log('Handling OPTIONS request');
     res.status(204).end();
     return;
   }
 
   if (req.method !== 'GET') {
+    console.log('Method not allowed:', req.method);
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
 
   try {
+    console.log('Processing GET request');
     const { msisdn } = req.query;
+    console.log('MSISDN parameter:', msisdn);
 
     if (!msisdn) {
+      console.log('Missing msisdn parameter');
       res.status(400).json({ error: 'Missing msisdn parameter' });
       return;
     }

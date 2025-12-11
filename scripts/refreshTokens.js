@@ -25,10 +25,19 @@ async function getSettings() {
 
 async function setToken(provider, tokenType, token, expiresAt) {
   // First, deactivate all existing tokens of this type
-  await supabase.from('integration_tokens').update({ active: false }).eq('provider', provider).eq('token_type', tokenType);
+  const { error: updateError } = await supabase
+    .from('integration_tokens')
+    .update({ active: false })
+    .eq('provider', provider)
+    .eq('token_type', tokenType);
+
+  if (updateError) {
+    console.error('Failed to deactivate existing tokens:', updateError);
+    throw updateError;
+  }
 
   // Then insert the new token
-  const { error } = await supabase.from('integration_tokens').insert({
+  const { error: insertError } = await supabase.from('integration_tokens').insert({
     provider,
     token_type: tokenType,
     token_value: token,
@@ -36,7 +45,7 @@ async function setToken(provider, tokenType, token, expiresAt) {
     active: true
   });
 
-  if (error) throw error;
+  if (insertError) throw insertError;
 }
 
 async function getAuthToken(authorizationToken) {

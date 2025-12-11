@@ -1,0 +1,40 @@
+name: Telenity Cron Jobs
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  refresh-tokens:
+    if: github.event.schedule == '0 */6 * * *'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - run: npm i --omit=dev
+      - name: Refresh Telenity tokens
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          AUTHORIZATION_TOKEN: ${{ secrets.AUTHORIZATION_TOKEN }}
+          CONSENT_AUTH_TOKEN: ${{ secrets.CONSENT_AUTH_TOKEN }}
+        run: node scripts/refreshTokens.js
+
+  poll-consent-and-location:
+    if: github.event.schedule == '*/5 * * * *'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - run: npm i --omit=dev
+      - name: Poll Consent and Location
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: node scripts/pollConsentAndLocation.js

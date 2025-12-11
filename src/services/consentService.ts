@@ -43,13 +43,15 @@ export async function checkConsentForDriver(driverId: string, msisdn: string) {
 
     // Call the Telenity consent API directly (using CORS proxy to handle cross-origin issues)
     const telenityUrl = `https://india-agw.telenity.com/apigw/NOFBconsent/v1/NOFBconsent?address=tel:+${msisdn}`;
-    // Use a CORS proxy to bypass browser CORS restrictions
-    const corsProxyUrl = `https://cors-anywhere.herokuapp.com/${telenityUrl}`;
 
-    console.log('Making request to:', corsProxyUrl);
+    // Use configurable proxy URL (can be set via environment variable)
+    const proxyBaseUrl = import.meta.env.VITE_CONSENT_PROXY_URL || 'https://cors-anywhere.herokuapp.com';
+    const proxyUrl = `${proxyBaseUrl}/${telenityUrl}`;
+
+    console.log('Making proxied request to:', proxyUrl);
 
     try {
-      const res = await fetch(corsProxyUrl, {
+      const res = await fetch(proxyUrl, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

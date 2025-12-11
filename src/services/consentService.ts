@@ -41,50 +41,26 @@ export async function checkConsentForDriver(driverId: string, msisdn: string) {
 
     const token = tokenData[0].token_value;
 
-    // Call the Telenity consent API directly (using CORS proxy to handle cross-origin issues)
+    // Call the Telenity consent API directly
     const telenityUrl = `https://india-agw.telenity.com/apigw/NOFBconsent/v1/NOFBconsent?address=tel:+${msisdn}`;
 
-    // Use configurable proxy URL (can be set via environment variable)
-    const proxyBaseUrl = import.meta.env.VITE_CONSENT_PROXY_URL || 'https://cors-anywhere.herokuapp.com';
-    const proxyUrl = `${proxyBaseUrl}/${telenityUrl}`;
+    const res = await fetch(telenityUrl, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': `bearer ${token}`
+      },
+    });
 
-    console.log('Making proxied request to:', proxyUrl);
+    if (!res.ok) {
+      throw new Error(`Consent check failed: ${res.status}`);
+    }
 
-    try {
-      const res = await fetch(proxyUrl, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `bearer ${token}`,
-          'X-Requested-With': 'XMLHttpRequest' // Required by cors-anywhere
-        },
-      });
+    const data = await res.json();
 
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error('Telenity API error response:', res.status, errorText);
-        throw new Error(`Consent check failed: ${res.status} - ${errorText}`);
-      }
-
-      let data;
-      try {
-        data = await res.json();
-        console.log('Telenity API response:', data);
-      } catch (parseError) {
-        const textResponse = await res.text();
-        console.error('Failed to parse JSON response:', parseError);
-        console.error('Raw response text:', textResponse.substring(0, 500));
-        throw new Error(`Invalid JSON response from Telenity API: ${textResponse.substring(0, 100)}...`);
-      }
-
-      // Extract the consent status from the response
-      const status = data?.Consent?.status || 'UNKNOWN';
-      console.log('Extracted consent status:', status);
-
-      if (status === 'UNKNOWN' && !data?.Consent) {
-        console.warn('Unexpected API response format - missing Consent object:', data);
-      }
+    // Extract the consent status from the response
+    const status = data?.Consent?.status || 'UNKNOWN';
 
     // Update the database with the fresh status
     await upsertConsentForDriver(driverId, msisdn, status);

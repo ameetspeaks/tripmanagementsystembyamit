@@ -17,6 +17,15 @@ async function getToken(provider, tokenType) {
     .order('expires_at', { ascending: false })
     .limit(1);
   if (!data || !data.length) return null;
+
+  // Check if token is expired
+  const expiresAt = new Date(data[0].expires_at);
+  const now = new Date();
+  if (expiresAt <= now) {
+    console.error(`Token expired: ${expiresAt} <= ${now}`);
+    return null;
+  }
+
   return { token: data[0].token_value, expiresAt: data[0].expires_at };
 }
 
@@ -46,11 +55,18 @@ export default async function handler(req, res) {
 
     const tok = await getToken('telenity', 'consent');
     if (!tok) {
-      res.status(500).json({ error: 'No consent token available' });
+      console.error('No valid consent token found');
+      res.status(500).json({ error: 'No consent token available or token expired' });
       return;
     }
 
-    const response = await fetch(`https://india-agw.telenity.com/apigw/NOFBconsent/v1/NOFBconsent?address=tel:+${msisdn}`, {
+    console.log(`Making consent check request for msisdn: ${msisdn}`);
+    console.log(`Using token (first 20 chars): ${tok.token.substring(0, 20)}...`);
+
+    const requestUrl = `https://india-agw.telenity.com/apigw/NOFBconsent/v1/NOFBconsent?address=tel:+${msisdn}`;
+    console.log(`Request URL: ${requestUrl}`);
+
+    const response = await fetch(requestUrl, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -58,6 +74,9 @@ export default async function handler(req, res) {
         'Authorization': `bearer ${tok.token}`
       },
     });
+
+    console.log(`Telenity API response status: ${response.status}`);
+    console.log(`Telenity API response headers:`, Object.fromEntries(response.headers.entries()));
 
     const responseText = await response.text();
     let responseBody;

@@ -42,14 +42,23 @@ export async function checkConsentForDriver(driverId: string, msisdn: string) {
     const token = tokenData[0].token_value;
 
     // Call the Telenity consent API directly
-    const telenityUrl = `https://india-agw.telenity.com/apigw/NOFBconsent/v1/NOFBconsent?address=tel:+${msisdn}`;
+    let apiUrl = `https://india-agw.telenity.com/apigw/NOFBconsent/v1/NOFBconsent?address=tel:+${msisdn}`;
 
-    const res = await fetch(telenityUrl, {
+    // If CORS proxy is configured, use it
+    const corsProxy = import.meta.env.VITE_CORS_PROXY;
+    if (corsProxy) {
+      apiUrl = `${corsProxy}${apiUrl}`;
+      console.log('Using CORS proxy:', corsProxy);
+    }
+
+    const res = await fetch(apiUrl, {
       method: 'GET',
+      mode: corsProxy ? 'cors' : 'cors',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'Authorization': `bearer ${token}`
+        'Authorization': `bearer ${token}`,
+        ...(corsProxy && { 'X-Requested-With': 'XMLHttpRequest' })
       },
     });
 
@@ -68,6 +77,12 @@ export async function checkConsentForDriver(driverId: string, msisdn: string) {
     return status;
   } catch (error) {
     console.error('Consent check error:', error);
+
+    // Check if it's a CORS or network error
+    if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+      console.error('CORS or network error: The Telenity API may not allow cross-origin requests from browsers');
+    }
+
     // Don't update the database on error, just return the current status
     const { data } = await supabase
       .from('consents')

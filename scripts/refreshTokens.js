@@ -59,15 +59,28 @@ async function getAuthToken(authorizationToken) {
 }
 
 async function getConsentAccessToken(consentAuthToken) {
+  console.log('Getting consent access token...');
   const res = await fetch('https://india-agw.telenity.com/oauth/token?grant_type=client_credentials', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: `Basic ${consentAuthToken}` },
     body: 'grant_type=client_credentials',
   });
-  if (!res.ok) throw new Error('Consent auth failed');
+
+  console.log('OAuth response status:', res.status);
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error('OAuth error response:', errorText);
+    throw new Error('Consent auth failed');
+  }
+
   const json = await res.json();
+  console.log('OAuth response:', json);
+
   const expiresIn = json.expires_in ?? 3600;
-  return { accessToken: json.access_token, expiresAt: toISTISO(Date.now() + expiresIn * 1000) };
+  const accessToken = json.access_token;
+  console.log('Access token received:', accessToken);
+
+  return { accessToken, expiresAt: toISTISO(Date.now() + expiresIn * 1000) };
 }
 
 async function run() {

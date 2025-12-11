@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabaseClient';
+import { config } from '@/lib/config';
 
 export async function upsertConsentForDriver(driverId: string, msisdn: string, status: string, opts?: { expiresAt?: string; entityId?: number; tracked?: boolean; importRequested?: boolean }) {
   const { data } = await supabase
@@ -41,13 +42,12 @@ export async function checkConsentForDriver(driverId: string, msisdn: string) {
 
     const token = tokenData[0].token_value;
 
-    // Call the Telenity consent API directly
-    const res = await fetch(`https://india-agw.telenity.com/apigw/NOFBconsent/v1/NOFBconsent?address=tel:+${msisdn}`, {
+    // Call the consent proxy API
+    const proxyUrl = `${config.apiBaseUrl}/api/consent?msisdn=${msisdn}`;
+    const res = await fetch(proxyUrl, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': '*/*',
-        'Authorization': `bearer ${token}`
       },
     });
 

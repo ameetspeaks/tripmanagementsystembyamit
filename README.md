@@ -1,73 +1,150 @@
-# Welcome to your Lovable project
+# Trip Management System
 
-## Project info
+A comprehensive logistics and transportation management system built with React, TypeScript, and Supabase.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## 🚀 Features
 
-## How can I edit this code?
+- **Trip Management**: Create and manage transportation trips with detailed tracking
+- **Driver Management**: Manage driver information and consent status
+- **Vehicle Fleet**: Track vehicles, types, and maintenance
+- **Location Management**: Handle origin/destination locations and lanes
+- **Real-time Tracking**: SIM-based GPS tracking integration with Telenity
+- **Shipment Mapping**: Link shipments to trips with detailed tracking
+- **User Authentication**: Secure authentication with role-based access
 
-There are several ways of editing your application.
+## 🛠️ Tech Stack
 
-**Use Lovable**
+- **Frontend**: React 18, TypeScript, Vite
+- **UI Framework**: shadcn/ui, Tailwind CSS
+- **Backend**: Supabase (PostgreSQL, Authentication, Real-time)
+- **Maps**: Google Maps API
+- **Tracking**: Telenity API integration
+- **Deployment**: Vercel/Netlify
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## 📋 Prerequisites
 
-Changes made via Lovable will be committed automatically to this repo.
+- Node.js 18+
+- npm or yarn
+- Supabase account
+- Telenity API credentials (for tracking)
 
-**Use your preferred IDE**
+## 🚀 Local Development
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/ameetspeaks/tripmanagementsystembyamit.git
+   cd tripmanagementsystembyamit
+   ```
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
 
-Follow these steps:
+3. **Environment Setup**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your credentials
+   ```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+4. **Start development server**
+   ```bash
+   npm run dev
+   ```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+5. **Build for production**
+   ```bash
+   npm run build
+   ```
 
-# Step 3: Install the necessary dependencies.
-npm i
+## 🔧 Environment Variables
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+Create a `.env` file with:
+
+```env
+# Supabase Configuration
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+
+# Google Maps
+VITE_GOOGLE_MAPS_API_KEY=your_google_maps_api_key
+
+# Telenity API Credentials (Base64 encoded)
+AUTHORIZATION_TOKEN=base64_username_password
+CONSENT_AUTH_TOKEN=base64_client_id_secret
 ```
 
-**Edit a file directly in GitHub**
+## 🌐 Deployment
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Option 1: Vercel (Recommended)
 
-**Use GitHub Codespaces**
+1. **Connect to Vercel**
+   - Go to [vercel.com](https://vercel.com)
+   - Import your GitHub repository
+   - Vercel will auto-detect the configuration
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+2. **Environment Variables**
+   - Add all environment variables in Vercel dashboard
+   - Redeploy after adding variables
 
-## What technologies are used for this project?
+3. **Deploy**
+   ```bash
+   git push origin main
+   ```
 
-This project is built with:
+### Option 2: Netlify
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+1. **Connect Repository**
+   - Go to [netlify.com](https://netlify.com)
+   - Connect your GitHub repository
+   - Set build command: `npm run build`
+   - Set publish directory: `dist`
 
-## How can I deploy this project?
+2. **Environment Variables**
+   - Configure environment variables in Netlify dashboard
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+### Option 3: Manual Build & Deploy
 
-## Can I connect a custom domain to my Lovable project?
+```bash
+# Build the project
+npm run build
 
-Yes, you can!
+# Deploy the dist folder to any static hosting service
+# Examples: GitHub Pages, AWS S3, Firebase Hosting
+```
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## 📊 Database Setup
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+The project uses Supabase. Run the SQL migrations in `supabase/migrations/` in order:
+
+1. `2025-12-11_0001_customers.sql`
+2. `2025-12-11_0002_profiles.sql`
+3. `2025-12-11_0003_drivers.sql`
+4. ... (run all migrations)
+
+## 🔑 API Integrations
+
+- **Telenity**: SIM-based GPS tracking and consent management
+- **Google Maps**: Location services and route visualization
+- **Supabase**: Database, authentication, and real-time subscriptions
+
+## 📝 Available Scripts
+
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run preview` - Preview production build
+- `npm run lint` - Run ESLint
+- `npm run refresh-tokens` - Refresh Telenity API tokens
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Open a Pull Request
+
+## 📄 License
+
+This project is private and proprietary.

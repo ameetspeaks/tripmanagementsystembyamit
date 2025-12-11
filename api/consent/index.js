@@ -212,11 +212,16 @@ export default async function handler(req, res) {
     console.log(`Telenity API response headers:`, Object.fromEntries(response.headers.entries()));
 
     const responseText = await response.text();
+    console.log(`Raw response (first 200 chars):`, responseText.substring(0, 200));
+    console.log(`Response content type:`, response.headers.get('content-type'));
+
     let responseBody;
     try {
       responseBody = JSON.parse(responseText);
-    } catch {
-      responseBody = { raw: responseText };
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError);
+      console.error('Response text:', responseText);
+      responseBody = { raw: responseText, parseError: parseError.message };
     }
 
     res.status(response.status).json(responseBody);

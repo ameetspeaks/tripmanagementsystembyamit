@@ -14,8 +14,18 @@ export async function getToken(provider: string, tokenType: string) {
 }
 
 export async function setToken(provider: string, tokenType: string, token: string, expiresAt: string) {
+  // First, deactivate all existing tokens of this type
   await supabase.from('integration_tokens').update({ active: false }).eq('provider', provider).eq('token_type', tokenType);
-  const { error } = await supabase.from('integration_tokens').insert({ provider, token_type: tokenType, token_value: token, expires_at: expiresAt, active: true });
+
+  // Then insert the new token
+  const { error } = await supabase.from('integration_tokens').insert({
+    provider,
+    token_type: tokenType,
+    token_value: token,
+    expires_at: expiresAt,
+    active: true
+  });
+
   if (error) throw error;
 }
 

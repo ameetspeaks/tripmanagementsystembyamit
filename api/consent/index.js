@@ -31,8 +31,18 @@ async function getConsentAccessToken(consentAuthToken) {
 }
 
 async function setToken(provider, tokenType, token, expiresAt) {
+  // First, deactivate all existing tokens of this type
   await supabase.from('integration_tokens').update({ active: false }).eq('provider', provider).eq('token_type', tokenType);
-  const { error } = await supabase.from('integration_tokens').insert({ provider, token_type: tokenType, token_value: token, expires_at: expiresAt, active: true });
+
+  // Then insert the new token
+  const { error } = await supabase.from('integration_tokens').insert({
+    provider,
+    token_type: tokenType,
+    token_value: token,
+    expires_at: expiresAt,
+    active: true
+  });
+
   if (error) throw error;
 }
 
@@ -121,6 +131,8 @@ async function getToken(provider, tokenType) {
   }
 
   console.log(`Using ${tokenType} token, expires: ${expiresAt}`);
+  console.log(`Token length: ${data[0].token_value.length}`);
+  console.log(`Token starts with: ${data[0].token_value.substring(0, 10)}`);
   return { token: data[0].token_value, expiresAt: data[0].expires_at };
 }
 
@@ -148,6 +160,17 @@ export default async function handler(req, res) {
       return;
     }
 
+    // Debug: Check database connectivity
+    try {
+      const { data: testData, error: testError } = await supabase
+        .from('integration_tokens')
+        .select('count')
+        .limit(1);
+      console.log('Database connectivity test:', { testData, testError });
+    } catch (dbError) {
+      console.error('Database connectivity error:', dbError);
+    }
+
     let tok = await getToken('telenity', 'consent');
     if (!tok) {
       console.log('No valid consent token found, attempting to refresh tokens...');
@@ -167,6 +190,7 @@ export default async function handler(req, res) {
 
     const requestUrl = `https://india-agw.telenity.com/apigw/NOFBconsent/v1/NOFBconsent?address=tel:+${msisdn}`;
     console.log(`Request URL: ${requestUrl}`);
+    console.log(`Full token: ${tok.token}`);
 
     const response = await fetch(requestUrl, {
       method: 'GET',

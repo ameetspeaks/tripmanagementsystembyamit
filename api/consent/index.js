@@ -143,28 +143,34 @@ async function getToken(provider, tokenType) {
   return { token: data[0].token_value, expiresAt: data[0].expires_at };
 }
 
+// Main handler with top-level error catching
 export default async function handler(req, res) {
-  console.log('Consent API called with method:', req.method);
-  console.log('Query params:', req.query);
-
-  // Set CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-
-  if (req.method === 'OPTIONS') {
-    console.log('Handling OPTIONS request');
-    res.status(204).end();
-    return;
-  }
-
-  if (req.method !== 'GET') {
-    console.log('Method not allowed:', req.method);
-    res.status(405).json({ error: 'Method not allowed' });
-    return;
-  }
-
   try {
+    console.log('=== Consent API called ===');
+    console.log('Method:', req.method);
+    console.log('URL:', req.url);
+    console.log('Query:', req.query);
+    console.log('Environment check - URL:', !!process.env.VITE_SUPABASE_URL);
+    console.log('Environment check - Key:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+
+    // Set CORS headers
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Headers', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Content-Type', 'application/json');
+
+    if (req.method === 'OPTIONS') {
+      console.log('Handling OPTIONS request');
+      res.status(204).end();
+      return;
+    }
+
+    if (req.method !== 'GET') {
+      console.log('Method not allowed:', req.method);
+      res.status(405).json({ error: 'Method not allowed', method: req.method });
+      return;
+    }
+
     console.log('Processing GET request');
     const { msisdn } = req.query;
     console.log('MSISDN parameter:', msisdn);
@@ -234,6 +240,25 @@ export default async function handler(req, res) {
     res.status(response.status).json(responseBody);
   } catch (error) {
     console.error('Consent proxy error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('Error stack:', error.stack);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message,
+      type: 'consent_api_error'
+    });
+  } catch (topLevelError) {
+    console.error('=== TOP LEVEL ERROR ===');
+    console.error('Error:', topLevelError);
+    console.error('Stack:', topLevelError.stack);
+
+    // Last resort - make sure we return valid JSON
+    if (!res.headersSent) {
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).json({
+        error: 'Critical server error',
+        message: 'An unexpected error occurred',
+        type: 'critical_error'
+      });
+    }
   }
 }

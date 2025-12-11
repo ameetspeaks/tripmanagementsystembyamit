@@ -178,11 +178,22 @@ export default async function handler(req, res) {
       console.error('Database connectivity error:', dbError);
     }
 
-    // Use the known working token
-    const accessToken = 'a067b5525ff1ea0842c200282d151bec';
+    let tok = await getToken('telenity', 'consent');
+    if (!tok) {
+      console.log('No valid consent token found, attempting to refresh tokens...');
+      const refreshed = await refreshTokensIfNeeded();
+      if (refreshed) {
+        tok = await getToken('telenity', 'consent');
+      }
+      if (!tok) {
+        console.error('Still no valid consent token after refresh attempt');
+        res.status(500).json({ error: 'No consent token available or token expired' });
+        return;
+      }
+    }
 
     console.log(`Making consent check request for msisdn: ${msisdn}`);
-    console.log(`Using access token: ${accessToken}`);
+    console.log(`Token available: ${!!tok.token}`);
 
     const requestUrl = `https://india-agw.telenity.com/apigw/NOFBconsent/v1/NOFBconsent?address=tel:+${msisdn}`;
     console.log(`Request URL: ${requestUrl}`);
@@ -192,7 +203,7 @@ export default async function handler(req, res) {
       headers: {
         'Content-Type': 'application/json',
         'Accept': '*/*',
-        'Authorization': `bearer ${accessToken}`
+        'Authorization': `bearer ${tok.token}`
       },
     });
 
